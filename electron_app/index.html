@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Gemi Tespit Uygulaması</title>
+  </head>
+  <body>
+    <h1>Gemi Tespit Uygulaması</h1>
+
+    <!-- Klasör seçme ve işleme butonları -->
+    <button id="selectDirBtn">Klasör Seç</button>
+    <p id="selectedDir"></p>
+    <button id="processImagesBtn">Görüntü İşle</button>
+
+    <!-- Resim listesi -->
+    <h3>Klasördeki Resimler:</h3>
+    <ul id="imageList"></ul>
+
+    <!-- Sonuç listesi (JSON içindeki gemi sayıları) -->
+    <h3>Sonuçlar (Gemi Sayıları):</h3>
+    <ul id="resultsList"></ul>
+
+    <!-- İşlenmiş resmi göstermek için basit bir <img> -->
+    <div>
+      <h3>Seçili İşlenmiş Görsel:</h3>
+      <img id="processedImage" width="400" alt="İşlenmiş Görsel" />
+    </div>
+
+    <script src="renderer.js"></script>
+  </body>
+</html>

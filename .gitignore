@@ -3,3 +3,5 @@
 *.vscode
 ships
 _proceed
+node_modules
+ships_proceed
