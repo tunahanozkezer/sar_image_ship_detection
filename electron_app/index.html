@@ -2,30 +2,115 @@
 <html>
   <head>
     <meta charset="UTF-8" />
-    <title>Gemi Tespit Uygulaması</title>
+    <title>Ship Detection GUI</title>
+    <style>
+      body {
+        font-family: sans-serif;
+        margin: 20px;
+      }
+      #imageList, #resultsTable {
+        margin-top: 20px;
+      }
+      table {
+        border-collapse: collapse;
+        width: 60%;
+      }
+      th, td {
+        border: 1px solid #ccc;
+        padding: 8px;
+      }
+    </style>
   </head>
   <body>
-    <h1>Gemi Tespit Uygulaması</h1>
+    <h1>SAR Görüntülerinden Gemi Tespiti</h1>
+    <button id="btnSelectFolder">Klasör Seç</button>
+    <button id="btnProcess" disabled>Görüntüleri İşle</button>
 
-    <!-- Klasör seçme ve işleme butonları -->
-    <button id="selectDirBtn">Klasör Seç</button>
-    <p id="selectedDir"></p>
-    <button id="processImagesBtn">Görüntü İşle</button>
+    <div id="imageList"></div>
+    <div id="resultsTable"></div>
 
-    <!-- Resim listesi -->
-    <h3>Klasördeki Resimler:</h3>
-    <ul id="imageList"></ul>
+    <script>
+      const btnSelectFolder = document.getElementById('btnSelectFolder');
+      const btnProcess = document.getElementById('btnProcess');
+      const imageListDiv = document.getElementById('imageList');
+      const resultsTableDiv = document.getElementById('resultsTable');
 
-    <!-- Sonuç listesi (JSON içindeki gemi sayıları) -->
-    <h3>Sonuçlar (Gemi Sayıları):</h3>
-    <ul id="resultsList"></ul>
+      let selectedFolder = null;
+      let imageNames = [];
 
-    <!-- İşlenmiş resmi göstermek için basit bir <img> -->
-    <div>
-      <h3>Seçili İşlenmiş Görsel:</h3>
-      <img id="processedImage" width="400" alt="İşlenmiş Görsel" />
-    </div>
+      // Handle "Select Folder"
+      btnSelectFolder.addEventListener('click', async () => {
+        const result = await window.electronAPI.selectFolder();
+        if (result.canceled) return;
 
-    <script src="renderer.js"></script>
+        selectedFolder = result.folderPath;
+        imageNames = result.imageNames;
+
+        // Display the image names
+        imageListDiv.innerHTML = '<h3>Klasördeki Görüntüler:</h3>';
+        if (imageNames.length > 0) {
+          const ul = document.createElement('ul');
+          imageNames.forEach((img) => {
+            const li = document.createElement('li');
+            li.textContent = img;
+            ul.appendChild(li);
+          });
+          imageListDiv.appendChild(ul);
+          btnProcess.disabled = false;
+        } else {
+          imageListDiv.innerHTML += '<p>Klasörde görüntü bulunamadı</p>';
+          btnProcess.disabled = true;
+        }
+      });
+
+      // Handle "Process Image"
+      btnProcess.addEventListener('click', async () => {
+        if (!selectedFolder) return;
+        btnProcess.disabled = true;  // disable to prevent double-click
+        resultsTableDiv.innerHTML = '<p>Görütnüler işleniyor, lütfen bekleyin...</p>';
+
+        try {
+          const result = await window.electronAPI.processImages(selectedFolder);
+
+          if (result.error) {
+            resultsTableDiv.innerHTML = `<p>Error: ${result.error}<br/>Raw Output: ${result.rawOutput}</p>`;
+            btnProcess.disabled = false;
+            return;
+          }
+
+          // Build a table of the results
+          elapsed_time = 0;
+
+          const table = document.createElement('table');
+          const header = document.createElement('tr');
+          header.innerHTML = '<th>Görüntü Adı</th><th>Tespit Edilen Gemi Sayısı</th>';
+          table.appendChild(header);
+        Object.entries(result).forEach(([filename, obj]) => {
+          const row = document.createElement('tr');
+          if(filename == "Gecen_Sure")
+          {
+            elapsed_time = obj["val"];
+          }
+          else
+          {
+            row.innerHTML = `<td>${filename}</td><td>${obj["val"]}</td>`;
+            table.appendChild(row);
+          }
+        });
+        
+
+          resultsTableDiv.innerHTML = `
+            <h3>İşlem Sonuçları</h3>
+            <p>Geçen Süre: ${elapsed_time.toFixed(2)}s</p>
+          `;
+          resultsTableDiv.appendChild(table);
+        } catch (err) {
+          resultsTableDiv.innerHTML = `<p>Hata: ${err}</p>`;
+        } finally {
+          btnProcess.disabled = false;
+        }
+     
+      });
+    </script>
   </body>
 </html>

@@ -61,25 +61,28 @@ def main(directory):
 
     start_time = time.time()
     results = {}
-
+    
     for filename in os.listdir(directory):
         if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp')):
             image_path = os.path.join(directory, filename)
-            print(f"{filename} isimli gorsel isleniyor...")
 
             processed_image, ship_count = process_image(image_path)
             if processed_image:
                 processed_image.save(os.path.join(output_dir, filename))
-            results[filename] = {"Gemi Sayisi": ship_count}
+            results[filename] = {"val": ship_count}
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    results["Gecen_Sure"] = {"val": elapsed_time}
 
     json_path = os.path.join(output_dir, "results.json")
     with open(json_path, "w") as f:
         json.dump(results, f, indent=4)
 
-    end_time = time.time()
-    elapsed_time = end_time - start_time
-    print(f"Veri isleme tamamlandi. Sonuclar {json_path}, islenmis gorsellerde {output_dir} klasorune eklendi.")
-    print(f"Toplam calisma suresi: {elapsed_time:.2f}sn.")
+    
+    
+    print(results)
+    # print(f"Veri isleme tamamlandi. Sonuclar {json_path}, islenmis gorsellerde {output_dir} klasorune eklendi.")
+    # print(f"Toplam calisma suresi: {elapsed_time:.2f}sn.")
 
     # Sonucu JSON formatta da konsola (stdout) yazabiliriz ki Electron oradan parse edebilsin.
     return {

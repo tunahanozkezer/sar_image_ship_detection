@@ -62,22 +62,34 @@ ipcRenderer.on('process-images-complete', (event, data) => {
     return;
   }
 
-  // resultsList’i temizleyip dolduralım
-  resultsList.innerHTML = "";
+  // resultsTableBody'yi temizleyip dolduralım
+  const resultsTableBody = document.getElementById('resultsTableBody');
+  resultsTableBody.innerHTML = ""; // Önceki sonuçları temizle
+
   Object.keys(parsed.results).forEach((filename) => {
     const shipCount = parsed.results[filename]["Gemi Sayisi"];
-    const li = document.createElement('li');
-    li.textContent = `${filename} -> Gemi Sayısı: ${shipCount}`;
 
-    // Tıklayınca işlenmiş resmi gösterelim
-    li.addEventListener('click', () => {
-      // İşlenmiş resimlerin kaydedildiği klasörü parsed.output_dir ile aldık
+    // Yeni bir satır oluştur
+    const row = document.createElement('tr');
+
+    // Resim İsmi sütunu
+    const nameCell = document.createElement('td');
+    nameCell.textContent = filename;
+    row.appendChild(nameCell);
+
+    // Gemi Sayısı sütunu
+    const countCell = document.createElement('td');
+    countCell.textContent = shipCount;
+    row.appendChild(countCell);
+
+    // Tıklanınca işlenmiş resmi göstermek için olay ekle
+    row.addEventListener('click', () => {
       const outputDir = parsed.output_dir;
       const processedImagePath = path.join(outputDir, filename);
-      // <img> etiketinin kaynağını bu path’e ayarlıyoruz
-      processedImage.src = processedImagePath;
+      document.getElementById('processedImage').src = processedImagePath;
     });
 
-    resultsList.appendChild(li);
+    // Satırı tabloya ekle
+    resultsTableBody.appendChild(row);
   });
 });

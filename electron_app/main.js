@@ -1,88 +1,112 @@
+// main.js
+
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
-const { spawn } = require('child_process');
 const fs = require('fs');
+const { spawn } = require('child_process');
 
-// Pencere oluşturma fonksiyonu
 function createWindow() {
   const win = new BrowserWindow({
-    width: 1000,
-    height: 800,
+    width: 800,
+    height: 600,
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'), // varsa preload
-      nodeIntegration: true,
-      contextIsolation: false,
+      // Preload script for secure IPC
+      preload: path.join(__dirname, 'preload.js'),
     },
   });
 
   win.loadFile('index.html');
 }
 
-// Uygulama hazır olduğunda pencere oluştur
 app.whenReady().then(() => {
   createWindow();
 
   app.on('activate', function () {
+    // On macOS it's common to re-create a window in the app when the
+    // dock icon is clicked and there are no other windows open.
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
 });
 
-// Uygulama tüm pencereler kapandığında çık
 app.on('window-all-closed', function () {
+  // On Windows and Linux, close the app when all windows are closed.
   if (process.platform !== 'darwin') app.quit();
 });
 
-// IPC (Render-ana süreç iletişimi)
-ipcMain.handle('select-directory', async (event) => {
-  // Kullanıcıdan bir klasör seçmesini istiyoruz
+// ---------- IPC HANDLERS ---------- //
 
+/**
+ * Handle folder selection
+ */
+ipcMain.handle('select-folder', async () => {
   const result = await dialog.showOpenDialog({
-    properties: ['openDirectory']
+    properties: ['openDirectory'],
   });
-  if (!result.canceled && result.filePaths.length > 0) {
-    return result.filePaths[0]; // seçilen klasör yolu
+
+  if (result.canceled || result.filePaths.length === 0) {
+    return { canceled: true, folderPath: null, imageNames: [] };
   }
-  return null;
+
+  const folderPath = result.filePaths[0];
+  const files = fs.readdirSync(folderPath);
+
+  // Filter out valid image extensions
+  const imageNames = files.filter((file) => {
+    const ext = path.extname(file).toLowerCase();
+    return ['.png', '.jpg', '.jpeg', '.bmp'].includes(ext);
+  });
+
+  return { canceled: false, folderPath, imageNames };
 });
 
-ipcMain.on('process-images', (event, directoryPath) => {
+/**
+ * Handle image processing request
+ */
+ipcMain.handle('process-images', async (event, folderPath) => {
+  return new Promise((resolve, reject) => {
+    // Spawn a Python process to run `script.py`
+    const pyProcess = spawn('python3', [path.join(__dirname, 'ship_detection/script.py'), folderPath]);
 
-  // Python scriptimizi child_process ile çalıştırıyoruz
-  const scriptPath = path.join(__dirname, 'ship_detection/script.py');
-  
-  // Burada `python` yerine kendi sanal environment'ınıza giden path'i koyabilirsiniz.
-  const pyProcess = spawn('python3', [scriptPath, directoryPath]);
+    let scriptOutput = '';
+    let scriptError = '';
 
-  let scriptOutput = "";
-  let scriptError = "";
+    // Collect data from stdout
+    pyProcess.stdout.on('data', (data) => {
+      scriptOutput += data.toString();
+    });
 
-  // Python’dan gelen stdout
-  pyProcess.stdout.on('data', (data) => {
-    scriptOutput += data.toString();
-  });
+    // Collect data from stderr
+    pyProcess.stderr.on('data', (data) => {
+      scriptError += data.toString();
+    });
 
-  // Python’dan gelen stderr
-  pyProcess.stderr.on('data', (data) => {
-    scriptError += data.toString();
-    console.error("STDERR: ", data.toString());
-  });
+    // On script exit
+    pyProcess.on('close', (code) => {
+      if (code !== 0) {
+        return reject(`Python script exited with code ${code}. Error: ${scriptError}`);
+      }
 
-  // İşlem bittiğinde
-  pyProcess.on('close', (code) => {
-    // Eğer script sonunda JSON basıyorsa, scriptOutput içinden parse edebiliriz.
-    // Örneğin `json.loads()`'a karşılık Node tarafında `JSON.parse(scriptOutput)`
-    let parsedData = {};
-    try {
-      parsedData = JSON.parse(scriptOutput);
-    } catch (err) {
-      console.error("JSON parse hatası:", err);
-    }
+      // The script prints JSON at the end in `main()`'s return statement.
+      // We want to parse that JSON out of scriptOutput if possible.
+      // We'll look for a JSON-like structure in the output.
+      try {
+        // A simple approach is to parse the entire scriptOutput directly as JSON.
+        // If your script prints other logs, you may need a more refined approach.
 
-    event.reply('process-images-complete', {
-      code,
-      output: scriptOutput,
-      error: scriptError,
-      parsed: parsedData
+
+        const correctedJsonString = scriptOutput.replace(/'/g, '"');
+        const parsedData = JSON.parse(correctedJsonString);
+        console.log(parsedData);
+        resolve(parsedData);
+        
+      } catch (err) {
+        // If parsing fails, we can at least return the raw text
+        resolve({
+          error: 'Could not parse JSON from Python output',
+          rawOutput: scriptOutput,
+        });
+      }
+
     });
   });
 });
